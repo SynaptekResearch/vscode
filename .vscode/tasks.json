@@ -32,10 +32,12 @@
 			"type": "gulp",
 			"task": "tslint",
 			"label": "Run tslint",
-			"problemMatcher": ["$tslint4"]
+			"problemMatcher": [
+				"$tslint5"
+			]
 		},
 		{
-			"taskName": "Run tests",
+			"label": "Run tests",
 			"type": "shell",
 			"command": "./scripts/test.sh",
 			"windows": {
@@ -48,17 +50,23 @@
 			}
 		},
 		{
-			"taskName": "Run Dev",
+			"label": "Run Dev",
 			"type": "shell",
 			"command": "./scripts/code.sh",
 			"windows": {
 				"command": ".\\scripts\\code.bat"
-			}
+			},
+			"problemMatcher": []
 		},
 		{
 			"type": "gulp",
 			"task": "electron",
 			"label": "Download electron"
+		},
+		{
+			"type": "gulp",
+			"task": "hygiene",
+			"problemMatcher": []
 		}
 	]
 }

@@ -5,21 +5,19 @@
 
 'use strict';
 
+import * as DOM from 'vs/base/browser/dom';
+import { IKeyboardEvent } from 'vs/base/browser/keyboardEvent';
+import { Widget } from 'vs/base/browser/ui/widget';
+import { Color } from 'vs/base/common/color';
+import { Emitter, Event } from 'vs/base/common/event';
+import { KeyCode } from 'vs/base/common/keyCodes';
+import * as objects from 'vs/base/common/objects';
 import 'vs/css!./checkbox';
 
-import DOM = require('vs/base/browser/dom');
-import * as objects from 'vs/base/common/objects';
-import { KeyCode } from 'vs/base/common/keyCodes';
-import { Widget } from 'vs/base/browser/ui/widget';
-import { IKeyboardEvent } from 'vs/base/browser/keyboardEvent';
-import { Color } from 'vs/base/common/color';
-
 export interface ICheckboxOpts extends ICheckboxStyles {
-	actionClassName: string;
-	title: string;
-	isChecked: boolean;
-	onChange: (viaKeyboard: boolean) => void;
-	onKeyDown?: (e: IKeyboardEvent) => void;
+	readonly actionClassName: string;
+	readonly title: string;
+	readonly isChecked: boolean;
 }
 
 export interface ICheckboxStyles {
@@ -32,20 +30,26 @@ const defaultOpts = {
 
 export class Checkbox extends Widget {
 
-	private _opts: ICheckboxOpts;
-	public domNode: HTMLElement;
+	private readonly _onChange = this._register(new Emitter<boolean>());
+	public readonly onChange: Event<boolean /* via keyboard */> = this._onChange.event;
+
+	private readonly _onKeyDown = this._register(new Emitter<IKeyboardEvent>());
+	public readonly onKeyDown: Event<IKeyboardEvent> = this._onKeyDown.event;
+
+	private readonly _opts: ICheckboxOpts;
+	public readonly domNode: HTMLElement;
 
 	private _checked: boolean;
 
 	constructor(opts: ICheckboxOpts) {
 		super();
-		this._opts = objects.clone(opts);
+		this._opts = objects.deepClone(opts);
 		objects.mixin(this._opts, defaultOpts, false);
 		this._checked = this._opts.isChecked;
 
 		this.domNode = document.createElement('div');
 		this.domNode.title = this._opts.title;
-		this.domNode.className = this._className();
+		this.domNode.className = 'monaco-custom-checkbox ' + this._opts.actionClassName + ' ' + (this._checked ? 'checked' : 'unchecked');
 		this.domNode.tabIndex = 0;
 		this.domNode.setAttribute('role', 'checkbox');
 		this.domNode.setAttribute('aria-checked', String(this._checked));
@@ -55,22 +59,24 @@ export class Checkbox extends Widget {
 
 		this.onclick(this.domNode, (ev) => {
 			this.checked = !this._checked;
-			this._opts.onChange(false);
+			this._onChange.fire(false);
 			ev.preventDefault();
 		});
 
 		this.onkeydown(this.domNode, (keyboardEvent) => {
 			if (keyboardEvent.keyCode === KeyCode.Space || keyboardEvent.keyCode === KeyCode.Enter) {
 				this.checked = !this._checked;
-				this._opts.onChange(true);
+				this._onChange.fire(true);
 				keyboardEvent.preventDefault();
 				return;
 			}
 
-			if (this._opts.onKeyDown) {
-				this._opts.onKeyDown(keyboardEvent);
-			}
+			this._onKeyDown.fire(keyboardEvent);
 		});
+	}
+
+	public get enabled(): boolean {
+		return this.domNode.getAttribute('aria-disabled') !== 'true';
 	}
 
 	public focus(): void {
@@ -84,12 +90,13 @@ export class Checkbox extends Widget {
 	public set checked(newIsChecked: boolean) {
 		this._checked = newIsChecked;
 		this.domNode.setAttribute('aria-checked', String(this._checked));
-		this.domNode.className = this._className();
-		this.applyStyles();
-	}
+		if (this._checked) {
+			this.domNode.classList.add('checked');
+		} else {
+			this.domNode.classList.remove('checked');
+		}
 
-	private _className(): string {
-		return 'custom-checkbox ' + this._opts.actionClassName + ' ' + (this._checked ? 'checked' : 'unchecked');
+		this.applyStyles();
 	}
 
 	public width(): number {
@@ -105,7 +112,7 @@ export class Checkbox extends Widget {
 
 	protected applyStyles(): void {
 		if (this.domNode) {
-			this.domNode.style.borderColor = this._checked && this._opts.inputActiveOptionBorder ? this._opts.inputActiveOptionBorder.toString() : null;
+			this.domNode.style.borderColor = this._checked && this._opts.inputActiveOptionBorder ? this._opts.inputActiveOptionBorder.toString() : 'transparent';
 		}
 	}
 

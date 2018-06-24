@@ -18,16 +18,22 @@ export interface IProductConfiguration {
 	downloadUrl: string;
 	updateUrl?: string;
 	quality?: string;
-	commit: string;
+	commit?: string;
+	settingsSearchBuildId?: number;
+	settingsSearchUrl?: string;
 	date: string;
 	extensionsGallery: {
 		serviceUrl: string;
 		itemUrl: string;
+		controlUrl: string;
+		recommendationsUrl: string;
 	};
 	extensionTips: { [id: string]: string; };
 	extensionImportantTips: { [id: string]: { name: string; pattern: string; }; };
+	exeBasedExtensionTips: { [id: string]: { friendlyName: string, windowsPath?: string, recommendations: string[] }; };
 	extensionKeywords: { [extension: string]: string[]; };
 	extensionAllowedBadgeProviders: string[];
+	extensionAllowedProposedApi: string[];
 	keymapExtensionTips: string[];
 	crashReporter: {
 		companyName: string;
@@ -54,6 +60,7 @@ export interface IProductConfiguration {
 	reportIssueUrl: string;
 	licenseUrl: string;
 	privacyStatementUrl: string;
+	telemetryOptOutUrl: string;
 	npsSurveyUrl: string;
 	surveys: ISurveyData[];
 	checksums: { [path: string]: string; };
@@ -65,6 +72,8 @@ export interface IProductConfiguration {
 		'linux-x64': string;
 		'darwin': string;
 	};
+	logUploaderUrl: string;
+	portable?: string;
 }
 
 export interface ISurveyData {

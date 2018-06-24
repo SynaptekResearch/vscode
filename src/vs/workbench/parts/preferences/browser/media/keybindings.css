@@ -14,7 +14,8 @@
 }
 
 .defineKeybindingWidget .monaco-inputbox,
-.defineKeybindingWidget .output {
+.defineKeybindingWidget .output,
+.defineKeybindingWidget .existing {
 	margin-top:10px;
 	width: 400px;
 	display: block;
@@ -30,7 +31,12 @@
 	justify-content: center;
 }
 
-.defineKeybindingWidget .output .htmlkb {
+.defineKeybindingWidget .existing .existingText {
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.defineKeybindingWidget .output .monaco-keybinding {
 	margin: 0px 4px;
 }
 

@@ -4,11 +4,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import parse from '@emmetio/html-matcher';
 import { HtmlNode } from 'EmmetNode';
-import { DocumentStreamReader } from './bufferStream';
-import { isStyleSheet } from 'vscode-emmet-helper';
-import { getNode } from './util';
+import { getHtmlNode, parseDocument, validate } from './util';
+
+let balanceOutStack: Array<vscode.Selection[]> = [];
+let lastOut = false;
+let lastBalancedSelections: vscode.Selection[] = [];
 
 export function balanceOut() {
 	balance(true);
@@ -19,35 +20,50 @@ export function balanceIn() {
 }
 
 function balance(out: boolean) {
-	let editor = vscode.window.activeTextEditor;
-	if (!editor) {
-		vscode.window.showInformationMessage('No editor is active');
+	if (!validate(false) || !vscode.window.activeTextEditor) {
 		return;
 	}
-	if (isStyleSheet(editor.document.languageId)) {
-		return;
-	}
-	let getRangeFunction = out ? getRangeToBalanceOut : getRangeToBalanceIn;
-
-	let rootNode: HtmlNode = parse(new DocumentStreamReader(editor.document));
+	const editor = vscode.window.activeTextEditor;
+	let rootNode = <HtmlNode>parseDocument(editor.document);
 	if (!rootNode) {
 		return;
 	}
 
+	let getRangeFunction = out ? getRangeToBalanceOut : getRangeToBalanceIn;
 	let newSelections: vscode.Selection[] = [];
 	editor.selections.forEach(selection => {
 		let range = getRangeFunction(editor.document, selection, rootNode);
-		newSelections.push(range ? range : selection);
+		newSelections.push(range);
 	});
 
-	editor.selection = newSelections[0];
-	editor.selections = newSelections;
+	if (areSameSelections(newSelections, editor.selections)) {
+		return;
+	}
+
+	if (areSameSelections(lastBalancedSelections, editor.selections)) {
+		if (out) {
+			if (!balanceOutStack.length) {
+				balanceOutStack.push(editor.selections);
+			}
+			balanceOutStack.push(newSelections);
+		} else {
+			if (lastOut) {
+				balanceOutStack.pop();
+			}
+			newSelections = balanceOutStack.pop() || newSelections;
+		}
+	} else {
+		balanceOutStack = out ? [editor.selections, newSelections] : [];
+	}
+
+	lastOut = out;
+	lastBalancedSelections = editor.selections = newSelections;
 }
 
 function getRangeToBalanceOut(document: vscode.TextDocument, selection: vscode.Selection, rootNode: HtmlNode): vscode.Selection {
-	let nodeToBalance = <HtmlNode>getNode(rootNode, selection.start);
+	let nodeToBalance = getHtmlNode(document, rootNode, selection.start);
 	if (!nodeToBalance) {
-		return;
+		return selection;
 	}
 	if (!nodeToBalance.close) {
 		return new vscode.Selection(nodeToBalance.start, nodeToBalance.end);
@@ -62,20 +78,23 @@ function getRangeToBalanceOut(document: vscode.TextDocument, selection: vscode.S
 	if (outerSelection.contains(selection) && !outerSelection.isEqual(selection)) {
 		return outerSelection;
 	}
-	return;
+	return selection;
 }
 
 function getRangeToBalanceIn(document: vscode.TextDocument, selection: vscode.Selection, rootNode: HtmlNode): vscode.Selection {
-	let nodeToBalance = <HtmlNode>getNode(rootNode, selection.start);
+	let nodeToBalance = getHtmlNode(document, rootNode, selection.start, true);
 	if (!nodeToBalance) {
-		return;
+		return selection;
+	}
+
+	if (selection.start.isEqual(nodeToBalance.start)
+		&& selection.end.isEqual(nodeToBalance.end)
+		&& nodeToBalance.close) {
+		return new vscode.Selection(nodeToBalance.open.end, nodeToBalance.close.start);
 	}
 
 	if (!nodeToBalance.firstChild) {
-		if (nodeToBalance.close) {
-			return new vscode.Selection(nodeToBalance.open.end, nodeToBalance.close.start);
-		}
-		return;
+		return selection;
 	}
 
 	if (selection.start.isEqual(nodeToBalance.firstChild.start)
@@ -88,3 +107,14 @@ function getRangeToBalanceIn(document: vscode.TextDocument, selection: vscode.Se
 
 }
 
+function areSameSelections(a: vscode.Selection[], b: vscode.Selection[]): boolean {
+	if (a.length !== b.length) {
+		return false;
+	}
+	for (let i = 0; i < a.length; i++) {
+		if (!a[i].isEqual(b[i])) {
+			return false;
+		}
+	}
+	return true;
+}

@@ -6,22 +6,54 @@
 'use strict';
 
 import { TPromise } from 'vs/base/common/winjs.base';
-import { OpenContext, IWindowConfiguration, ReadyState, IPath } from 'vs/platform/windows/common/windows';
+import { OpenContext, IWindowConfiguration, ReadyState, INativeOpenDialogOptions, IEnterWorkspaceResult, IMessageBoxResult } from 'vs/platform/windows/common/windows';
 import { ParsedArgs } from 'vs/platform/environment/common/environment';
-import Event from 'vs/base/common/event';
-import { ITelemetryData } from 'vs/platform/telemetry/common/telemetry';
-import { createDecorator } from "vs/platform/instantiation/common/instantiation";
-import { IProcessEnvironment } from "vs/base/common/platform";
+import { Event } from 'vs/base/common/event';
+import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
+import { IProcessEnvironment } from 'vs/base/common/platform';
+import { IWorkspaceIdentifier, IWorkspaceFolderCreationData } from 'vs/platform/workspaces/common/workspaces';
+import { ISerializableCommandAction } from 'vs/platform/actions/common/actions';
+
+export interface IWindowState {
+	width?: number;
+	height?: number;
+	x?: number;
+	y?: number;
+	mode?: WindowMode;
+	display?: number;
+}
+
+export enum WindowMode {
+	Maximized,
+	Normal,
+	Minimized, // not used anymore, but also cannot remove due to existing stored UI state (needs migration)
+	Fullscreen
+}
 
 export interface ICodeWindow {
 	id: number;
 	win: Electron.BrowserWindow;
 	config: IWindowConfiguration;
-	openedWorkspacePath: string;
+
+	openedFolderPath: string;
+	openedWorkspace: IWorkspaceIdentifier;
+	backupPath: string;
+
+	isExtensionDevelopmentHost: boolean;
+	isExtensionTestHost: boolean;
+
+	lastFocusTime: number;
 
 	readyState: ReadyState;
+	ready(): TPromise<ICodeWindow>;
 
+	load(config: IWindowConfiguration, isReload?: boolean, disableExtensions?: boolean): void;
+	reload(configuration?: IWindowConfiguration, cli?: ParsedArgs): void;
+
+	focus(): void;
 	close(): void;
+
+	getBounds(): Electron.Rectangle;
 
 	send(channel: string, ...args: any[]): void;
 	sendWhenReady(channel: string, ...args: any[]): void;
@@ -31,32 +63,51 @@ export interface ICodeWindow {
 	setRepresentedFilename(name: string): void;
 	getRepresentedFilename(): string;
 	onWindowTitleDoubleClick(): void;
+
+	updateTouchBar(items: ISerializableCommandAction[][]): void;
+
+	setReady(): void;
+	serializeWindowState(): IWindowState;
+
+	dispose(): void;
 }
 
 export const IWindowsMainService = createDecorator<IWindowsMainService>('windowsMainService');
+
+export interface IWindowsCountChangedEvent {
+	oldCount: number;
+	newCount: number;
+}
 
 export interface IWindowsMainService {
 	_serviceBrand: any;
 
 	// events
 	onWindowReady: Event<ICodeWindow>;
+	onActiveWindowChanged: Event<ICodeWindow>;
+	onWindowsCountChanged: Event<IWindowsCountChangedEvent>;
 	onWindowClose: Event<number>;
 	onWindowReload: Event<number>;
-	onPathsOpen: Event<IPath[]>;
 
 	// methods
 	ready(initialUserEnv: IProcessEnvironment): void;
 	reload(win: ICodeWindow, cli?: ParsedArgs): void;
+	createAndEnterWorkspace(win: ICodeWindow, folders?: IWorkspaceFolderCreationData[], path?: string): TPromise<IEnterWorkspaceResult>;
+	saveAndEnterWorkspace(win: ICodeWindow, path: string): TPromise<IEnterWorkspaceResult>;
+	closeWorkspace(win: ICodeWindow): void;
 	open(openConfig: IOpenConfiguration): ICodeWindow[];
 	openExtensionDevelopmentHostWindow(openConfig: IOpenConfiguration): void;
-	pickFileFolderAndOpen(forceNewWindow?: boolean, data?: ITelemetryData): void;
-	pickFileAndOpen(forceNewWindow?: boolean, path?: string, window?: ICodeWindow, data?: ITelemetryData): void;
-	pickFolderAndOpen(forceNewWindow?: boolean, window?: ICodeWindow, data?: ITelemetryData): void;
-	pickFolder(options?: { buttonLabel: string; title: string; }): TPromise<string[]>;
+	pickFileFolderAndOpen(options: INativeOpenDialogOptions): void;
+	pickFolderAndOpen(options: INativeOpenDialogOptions): void;
+	pickFileAndOpen(options: INativeOpenDialogOptions): void;
+	pickWorkspaceAndOpen(options: INativeOpenDialogOptions): void;
+	showMessageBox(options: Electron.MessageBoxOptions, win?: ICodeWindow): TPromise<IMessageBoxResult>;
+	showSaveDialog(options: Electron.SaveDialogOptions, win?: ICodeWindow): TPromise<string>;
+	showOpenDialog(options: Electron.OpenDialogOptions, win?: ICodeWindow): TPromise<string[]>;
 	focusLastActive(cli: ParsedArgs, context: OpenContext): ICodeWindow;
 	getLastActiveWindow(): ICodeWindow;
-	findWindow(workspacePath: string, filePath?: string, extensionDevelopmentPath?: string): ICodeWindow;
-	openNewWindow(context: OpenContext): void;
+	waitForWindowCloseOrLoad(windowId: number): TPromise<void>;
+	openNewWindow(context: OpenContext): ICodeWindow[];
 	sendToFocused(channel: string, ...args: any[]): void;
 	sendToAll(channel: string, payload: any, windowIdsToIgnore?: number[]): void;
 	getFocusedWindow(): ICodeWindow;
@@ -68,6 +119,7 @@ export interface IWindowsMainService {
 
 export interface IOpenConfiguration {
 	context: OpenContext;
+	contextWindowId?: number;
 	cli: ParsedArgs;
 	userEnv?: IProcessEnvironment;
 	pathsToOpen?: string[];
@@ -75,8 +127,9 @@ export interface IOpenConfiguration {
 	forceNewWindow?: boolean;
 	forceReuseWindow?: boolean;
 	forceEmpty?: boolean;
-	windowToUse?: ICodeWindow;
 	diffMode?: boolean;
+	addMode?: boolean;
+	forceOpenWorkspaceAsFile?: boolean;
 	initialStartup?: boolean;
 }
 

@@ -35,6 +35,10 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/parts/comments",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/parts/debug",
 			"project": "vscode-workbench"
 		},
@@ -44,10 +48,6 @@
 		},
 		{
 			"name": "vs/workbench/parts/execution",
-			"project": "vscode-workbench"
-		},
-		{
-			"name": "vs/workbench/parts/explorers",
 			"project": "vscode-workbench"
 		},
 		{
@@ -71,7 +71,11 @@
 			"project": "vscode-workbench"
 		},
 		{
-			"name": "vs/workbench/parts/nps",
+			"name": "vs/workbench/parts/localizations",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/parts/logs",
 			"project": "vscode-workbench"
 		},
 		{
@@ -131,7 +135,7 @@
 			"project": "vscode-workbench"
 		},
 		{
-			"name": "vs/workbench/parts/views",
+			"name": "vs/workbench/parts/url",
 			"project": "vscode-workbench"
 		},
 		{
@@ -139,7 +143,23 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/parts/webview",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/parts/welcome",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/parts/outline",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/actions",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/bulkEdit",
 			"project": "vscode-workbench"
 		},
 		{
@@ -147,11 +167,27 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/services/configurationResolver",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/services/crashReporter",
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/services/dialogs",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/services/editor",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/extensions",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/jsonschemas",
 			"project": "vscode-workbench"
 		},
 		{
@@ -160,10 +196,6 @@
 		},
 		{
 			"name": "vs/workbench/services/keybinding",
-			"project": "vscode-workbench"
-		},
-		{
-			"name": "vs/workbench/services/message",
 			"project": "vscode-workbench"
 		},
 		{
@@ -187,8 +219,16 @@
 			"project": "vscode-workbench"
 		},
 		{
-			"name": "setup_messages",
+			"name": "vs/workbench/services/workspace",
 			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/decorations",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/preferences",
+			"project": "vscode-preferences"
 		}
 	]
 }

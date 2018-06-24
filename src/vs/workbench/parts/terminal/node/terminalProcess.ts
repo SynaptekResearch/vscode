@@ -9,7 +9,7 @@ import * as pty from 'node-pty';
 
 // The pty process needs to be run in its own child process to get around maxing out CPU on Mac,
 // see https://github.com/electron/electron/issues/38
-var shellName: string;
+let shellName: string;
 if (os.platform() === 'win32') {
 	shellName = path.basename(process.env.PTYSHELL);
 } else {
@@ -17,14 +17,14 @@ if (os.platform() === 'win32') {
 	// color prompt as defined in the default ~/.bashrc file.
 	shellName = 'xterm-256color';
 }
-var shell = process.env.PTYSHELL;
-var args = getArgs();
-var cwd = process.env.PTYCWD;
-var cols = process.env.PTYCOLS;
-var rows = process.env.PTYROWS;
-var currentTitle = '';
+const shell = process.env.PTYSHELL;
+const args = getArgs();
+const cwd = process.env.PTYCWD;
+const cols = process.env.PTYCOLS;
+const rows = process.env.PTYROWS;
+let currentTitle = '';
 
-setupPlanB(process.env.PTYPID);
+setupPlanB(Number(process.env.PTYPID));
 cleanEnv();
 
 interface IOptions {
@@ -34,7 +34,7 @@ interface IOptions {
 	rows?: number;
 }
 
-var options: IOptions = {
+const options: IOptions = {
 	name: shellName,
 	cwd
 };
@@ -43,14 +43,17 @@ if (cols && rows) {
 	options.rows = parseInt(rows, 10);
 }
 
-var ptyProcess = pty.fork(shell, args, options);
+const ptyProcess = pty.spawn(shell, args, options);
 
-var closeTimeout;
-var exitCode;
+let closeTimeout: number;
+let exitCode: number;
 
 // Allow any trailing data events to be sent before the exit event is sent.
 // See https://github.com/Tyriar/node-pty/issues/72
 function queueProcessExit() {
+	if (closeTimeout) {
+		clearTimeout(closeTimeout);
+	}
 	closeTimeout = setTimeout(function () {
 		ptyProcess.kill();
 		process.exit(exitCode);
@@ -77,19 +80,23 @@ process.on('message', function (message) {
 	if (message.event === 'input') {
 		ptyProcess.write(message.data);
 	} else if (message.event === 'resize') {
-		ptyProcess.resize(message.cols, message.rows);
+		// Ensure that cols and rows are always >= 1, this prevents a native
+		// exception in winpty.
+		ptyProcess.resize(Math.max(message.cols, 1), Math.max(message.rows, 1));
+	} else if (message.event === 'shutdown') {
+		queueProcessExit();
 	}
 });
 
 sendProcessId();
 setupTitlePolling();
 
-function getArgs() {
+function getArgs(): string | string[] {
 	if (process.env['PTYSHELLCMDLINE']) {
 		return process.env['PTYSHELLCMDLINE'];
 	}
-	var args = [];
-	var i = 0;
+	const args = [];
+	let i = 0;
 	while (process.env['PTYSHELLARG' + i]) {
 		args.push(process.env['PTYSHELLARG' + i]);
 		i++;
@@ -98,28 +105,33 @@ function getArgs() {
 }
 
 function cleanEnv() {
-	var keys = [
+	const keys = [
 		'AMD_ENTRYPOINT',
+		'ELECTRON_NO_ASAR',
 		'ELECTRON_RUN_AS_NODE',
+		'GOOGLE_API_KEY',
 		'PTYCWD',
 		'PTYPID',
 		'PTYSHELL',
 		'PTYCOLS',
 		'PTYROWS',
-		'PTYSHELLCMDLINE'
+		'PTYSHELLCMDLINE',
+		'VSCODE_LOGS',
+		'VSCODE_PORTABLE'
 	];
 	keys.forEach(function (key) {
 		if (process.env[key]) {
 			delete process.env[key];
 		}
 	});
-	var i = 0;
+	let i = 0;
 	while (process.env['PTYSHELLARG' + i]) {
 		delete process.env['PTYSHELLARG' + i];
+		i++;
 	}
 }
 
-function setupPlanB(parentPid) {
+function setupPlanB(parentPid: number) {
 	setInterval(function () {
 		try {
 			process.kill(parentPid, 0); // throws an exception if the main process doesn't exist anymore.

@@ -7,12 +7,14 @@ import * as vscode from 'vscode';
 import { getDeepestNode, findNextWord, findPrevWord, getNode } from './util';
 import { Node, CssNode, Rule, Property } from 'EmmetNode';
 
-export function nextItemStylesheet(startOffset: vscode.Position, endOffset: vscode.Position, editor: vscode.TextEditor, rootNode: Node): vscode.Selection {
+export function nextItemStylesheet(startOffset: vscode.Position, endOffset: vscode.Position, editor: vscode.TextEditor, rootNode: Node): vscode.Selection | undefined {
 	let currentNode = <CssNode>getNode(rootNode, endOffset, true);
 	if (!currentNode) {
 		currentNode = <CssNode>rootNode;
 	}
-
+	if (!currentNode) {
+		return;
+	}
 	// Full property is selected, so select full property value next
 	if (currentNode.type === 'property' && startOffset.isEqual(currentNode.start) && endOffset.isEqual(currentNode.end)) {
 		return getSelectionFromProperty(currentNode, editor.document, startOffset, endOffset, true, 'next');
@@ -48,10 +50,13 @@ export function nextItemStylesheet(startOffset: vscode.Position, endOffset: vsco
 
 }
 
-export function prevItemStylesheet(startOffset: vscode.Position, endOffset: vscode.Position, editor: vscode.TextEditor, rootNode: CssNode): vscode.Selection {
+export function prevItemStylesheet(startOffset: vscode.Position, endOffset: vscode.Position, editor: vscode.TextEditor, rootNode: CssNode): vscode.Selection | undefined {
 	let currentNode = <CssNode>getNode(rootNode, startOffset);
 	if (!currentNode) {
 		currentNode = rootNode;
+	}
+	if (!currentNode) {
+		return;
 	}
 
 	// Full property value is selected, so select the whole property next
@@ -83,7 +88,7 @@ export function prevItemStylesheet(startOffset: vscode.Position, endOffset: vsco
 }
 
 
-function getSelectionFromNode(node: Node, document: vscode.TextDocument): vscode.Selection {
+function getSelectionFromNode(node: Node, document: vscode.TextDocument): vscode.Selection | undefined {
 	if (!node) {
 		return;
 	}
@@ -93,7 +98,7 @@ function getSelectionFromNode(node: Node, document: vscode.TextDocument): vscode
 }
 
 
-function getSelectionFromProperty(node: Node, document: vscode.TextDocument, selectionStart: vscode.Position, selectionEnd: vscode.Position, selectFullValue: boolean, direction: string): vscode.Selection {
+function getSelectionFromProperty(node: Node, document: vscode.TextDocument, selectionStart: vscode.Position, selectionEnd: vscode.Position, selectFullValue: boolean, direction: string): vscode.Selection | undefined {
 	if (!node || node.type !== 'property') {
 		return;
 	}
@@ -106,7 +111,7 @@ function getSelectionFromProperty(node: Node, document: vscode.TextDocument, sel
 		return new vscode.Selection(propertyNode.valueToken.start, propertyNode.valueToken.end);
 	}
 
-	let pos;
+	let pos: number = -1;
 	if (direction === 'prev') {
 		if (selectionStart.isEqual(propertyNode.valueToken.start)) {
 			return;

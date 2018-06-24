@@ -7,9 +7,9 @@
 
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { IDisposable } from 'vs/base/common/lifecycle';
-import { ThemeColor } from "vs/platform/theme/common/themeService";
+import { ThemeColor } from 'vs/platform/theme/common/themeService';
 
-export var IStatusbarService = createDecorator<IStatusbarService>('statusbarService');
+export const IStatusbarService = createDecorator<IStatusbarService>('statusbarService');
 
 export enum StatusbarAlignment {
 	LEFT, RIGHT
@@ -43,9 +43,19 @@ export interface IStatusbarEntry {
 	command?: string;
 
 	/**
+	 * Optional arguments for the command.
+	 */
+	arguments?: any[];
+
+	/**
 	 * An optional extension ID if this entry is provided from an extension.
 	 */
 	extensionId?: string;
+
+	/**
+	 * Wether to show a beak above the status bar entry.
+	 */
+	showBeak?: boolean;
 }
 
 export interface IStatusbarService {

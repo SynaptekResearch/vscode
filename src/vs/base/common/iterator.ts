@@ -5,22 +5,31 @@
 
 'use strict';
 
-export interface IIterator<T> {
+export interface IIteratorResult<T> {
+	readonly done: boolean;
+	readonly value: T;
+}
+
+export interface IIterator<E> {
+	next(): IIteratorResult<E>;
+}
+
+export interface INextIterator<T> {
 	next(): T;
 }
 
-export class ArrayIterator<T> implements IIterator<T> {
+export class ArrayIterator<T> implements INextIterator<T> {
 
 	private items: T[];
 	protected start: number;
 	protected end: number;
 	protected index: number;
 
-	constructor(items: T[], start: number = 0, end: number = items.length) {
+	constructor(items: T[], start: number = 0, end: number = items.length, index = start - 1) {
 		this.items = items;
 		this.start = start;
 		this.end = end;
-		this.index = start - 1;
+		this.index = index;
 	}
 
 	public first(): T {
@@ -44,8 +53,8 @@ export class ArrayIterator<T> implements IIterator<T> {
 
 export class ArrayNavigator<T> extends ArrayIterator<T> implements INavigator<T> {
 
-	constructor(items: T[], start: number = 0, end: number = items.length) {
-		super(items, start, end);
+	constructor(items: T[], start: number = 0, end: number = items.length, index = start - 1) {
+		super(items, start, end, index);
 	}
 
 	public current(): T {
@@ -73,16 +82,16 @@ export class ArrayNavigator<T> extends ArrayIterator<T> implements INavigator<T>
 
 }
 
-export class MappedIterator<T, R> implements IIterator<R> {
+export class MappedIterator<T, R> implements INextIterator<R> {
 
-	constructor(protected iterator: IIterator<T>, protected fn: (item: T) => R) {
+	constructor(protected iterator: INextIterator<T>, protected fn: (item: T) => R) {
 		// noop
 	}
 
 	next() { return this.fn(this.iterator.next()); }
 }
 
-export interface INavigator<T> extends IIterator<T> {
+export interface INavigator<T> extends INextIterator<T> {
 	current(): T;
 	previous(): T;
 	parent(): T;

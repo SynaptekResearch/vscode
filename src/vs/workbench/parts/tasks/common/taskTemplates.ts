@@ -27,11 +27,11 @@ const dotnetBuild: TaskEntry = {
 		'\t"version": "2.0.0",',
 		'\t"tasks": [',
 		'\t\t{',
-		'\t\t\t"taskName": "build",',
-		'\t\t\t"command": "dotnet",',
+		'\t\t\t"label": "build",',
+		'\t\t\t"command": "dotnet build",',
 		'\t\t\t"type": "shell",',
 		'\t\t\t"group": "build",',
-		'\t\t\t"terminal": {',
+		'\t\t\t"presentation": {',
 		'\t\t\t\t"reveal": "silent"',
 		'\t\t\t},',
 		'\t\t\t"problemMatcher": "$msCompile"',
@@ -53,7 +53,8 @@ const msbuild: TaskEntry = {
 		'\t"version": "2.0.0",',
 		'\t"tasks": [',
 		'\t\t{',
-		'\t\t\t"taskName": "build",',
+		'\t\t\t"label": "build",',
+		'\t\t\t"type": "shell",',
 		'\t\t\t"command": "msbuild",',
 		'\t\t\t"args": [',
 		'\t\t\t\t// Ask msbuild to generate full paths for file names.',
@@ -61,8 +62,8 @@ const msbuild: TaskEntry = {
 		'\t\t\t\t"/t:build"',
 		'\t\t\t],',
 		'\t\t\t"group": "build",',
-		'\t\t\t"terminal": {',
-		'\t\t\t\t// Reveal the terminal only if unrecognized errors occur.',
+		'\t\t\t"presentation": {',
+		'\t\t\t\t// Reveal the output only if unrecognized errors occur.',
 		'\t\t\t\t"reveal": "silent"',
 		'\t\t\t},',
 		'\t\t\t// Use the standard MS compiler pattern to detect errors, warnings and infos',
@@ -85,9 +86,9 @@ const command: TaskEntry = {
 		'\t"version": "2.0.0",',
 		'\t"tasks": [',
 		'\t\t{',
-		'\t\t\t"taskName": "echo",',
-		'\t\t\t"command": "echo Hello",',
-		'\t\t\t"type": "shell"',
+		'\t\t\t"label": "echo",',
+		'\t\t\t"type": "shell",',
+		'\t\t\t"command": "echo Hello"',
 		'\t\t}',
 		'\t]',
 		'}'
@@ -107,15 +108,15 @@ const maven: TaskEntry = {
 		'\t"version": "2.0.0",',
 		'\t"tasks": [',
 		'\t\t{',
-		'\t\t\t"taskName": "verify",',
-		'\t\t\t"command": "mvn -B verify",',
+		'\t\t\t"label": "verify",',
 		'\t\t\t"type": "shell",',
+		'\t\t\t"command": "mvn -B verify",',
 		'\t\t\t"group": "build"',
 		'\t\t},',
 		'\t\t{',
-		'\t\t\t"taskName": "test",',
-		'\t\t\t"command": "mvn -B test",',
+		'\t\t\t"label": "test",',
 		'\t\t\t"type": "shell",',
+		'\t\t\t"command": "mvn -B test",',
 		'\t\t\t"group": "test"',
 		'\t\t}',
 		'\t]',
@@ -123,10 +124,16 @@ const maven: TaskEntry = {
 	].join('\n')
 };
 
-export let templates: TaskEntry[] = [dotnetBuild, msbuild, maven].sort((a, b) => {
-	return (a.sort || a.label).localeCompare(b.sort || b.label);
-});
-templates.push(command);
+let _templates: TaskEntry[] = null;
+export function getTemplates(): TaskEntry[] {
+	if (!_templates) {
+		_templates = [dotnetBuild, msbuild, maven].sort((a, b) => {
+			return (a.sort || a.label).localeCompare(b.sort || b.label);
+		});
+		_templates.push(command);
+	}
+	return _templates;
+}
 
 
 /** Version 1.0 templates

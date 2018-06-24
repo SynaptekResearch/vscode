@@ -4,16 +4,24 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
+import URI from 'vs/base/common/uri';
 import * as assert from 'assert';
 import Severity from 'vs/base/common/severity';
 import * as UUID from 'vs/base/common/uuid';
 
 import * as Platform from 'vs/base/common/platform';
 import { ValidationStatus } from 'vs/base/common/parsers';
-import { ProblemMatcher, FileLocationKind, ProblemPattern, ApplyToKind } from 'vs/platform/markers/common/problemMatcher';
+import { ProblemMatcher, FileLocationKind, ProblemPattern, ApplyToKind } from 'vs/workbench/parts/tasks/common/problemMatcher';
+import { IWorkspaceFolder, WorkspaceFolder } from 'vs/platform/workspace/common/workspace';
 
 import * as Tasks from 'vs/workbench/parts/tasks/common/tasks';
 import { parse, ParseResult, IProblemReporter, ExternalTaskRunnerConfiguration, CustomTask } from 'vs/workbench/parts/tasks/node/taskConfiguration';
+
+const workspaceFolder: IWorkspaceFolder = new WorkspaceFolder({
+	uri: URI.file('/workspace/folderOne'),
+	name: 'folderOne',
+	index: 0
+});
 
 class ProblemReporter implements IProblemReporter {
 
@@ -46,11 +54,6 @@ class ProblemReporter implements IProblemReporter {
 		this.receivedMessage = true;
 		this.lastMessage = message;
 	}
-
-	public clearOutput(): void {
-		this.receivedMessage = false;
-		this.lastMessage = undefined;
-	}
 }
 
 class ConfiguationBuilder {
@@ -82,7 +85,7 @@ class PresentationBuilder {
 	public result: Tasks.PresentationOptions;
 
 	constructor(public parent: CommandConfigurationBuilder) {
-		this.result = { echo: false, reveal: Tasks.RevealKind.Always, focus: false, panel: Tasks.PanelKind.Shared };
+		this.result = { echo: false, reveal: Tasks.RevealKind.Always, focus: false, panel: Tasks.PanelKind.Shared, showReuseMessage: true };
 	}
 
 	public echo(value: boolean): PresentationBuilder {
@@ -105,6 +108,11 @@ class PresentationBuilder {
 		return this;
 	}
 
+	public showReuseMessage(value: boolean): PresentationBuilder {
+		this.result.showReuseMessage = value;
+		return this;
+	}
+
 	public done(): void {
 	}
 }
@@ -121,7 +129,7 @@ class CommandConfigurationBuilder {
 			runtime: Tasks.RuntimeType.Process,
 			args: [],
 			options: {
-				cwd: '${workspaceRoot}'
+				cwd: '${workspaceFolder}'
 			},
 			presentation: this.presentationBuilder.result,
 			suppressTaskName: false
@@ -177,7 +185,7 @@ class CustomTaskBuilder {
 		this.commandBuilder = new CommandConfigurationBuilder(this, command);
 		this.result = {
 			_id: name,
-			_source: { kind: Tasks.TaskSourceKind.Workspace, label: 'workspace' },
+			_source: { kind: Tasks.TaskSourceKind.Workspace, label: 'workspace', config: { workspaceFolder: workspaceFolder, element: undefined, index: -1, file: '.vscode/tasks.json' } },
 			_label: name,
 			type: 'custom',
 			identifier: name,
@@ -185,7 +193,8 @@ class CustomTaskBuilder {
 			command: this.commandBuilder.result,
 			isBackground: false,
 			promptOnClose: true,
-			problemMatchers: []
+			problemMatchers: [],
+			hasDefinedMatchers: false
 		};
 	}
 
@@ -196,6 +205,12 @@ class CustomTaskBuilder {
 
 	public group(value: Tasks.TaskGroup): CustomTaskBuilder {
 		this.result.group = value;
+		this.result.groupType = Tasks.GroupType.user;
+		return this;
+	}
+
+	public groupType(value: Tasks.GroupType): CustomTaskBuilder {
+		this.result.groupType = value;
 		return this;
 	}
 
@@ -226,7 +241,7 @@ class CustomTaskBuilder {
 
 class ProblemMatcherBuilder {
 
-	public static DEFAULT_UUID = UUID.generateUuid();
+	public static readonly DEFAULT_UUID = UUID.generateUuid();
 
 	public result: ProblemMatcher;
 
@@ -236,7 +251,7 @@ class ProblemMatcherBuilder {
 			applyTo: ApplyToKind.allDocuments,
 			severity: undefined,
 			fileLocation: FileLocationKind.Relative,
-			filePrefix: '${cwd}',
+			filePrefix: '${workspaceFolder}',
 			pattern: undefined
 		};
 	}
@@ -341,7 +356,7 @@ class PatternBuilder {
 
 function testDefaultProblemMatcher(external: ExternalTaskRunnerConfiguration, resolved: number) {
 	let reporter = new ProblemReporter();
-	let result = parse(external, reporter);
+	let result = parse(workspaceFolder, Platform.platform, external, reporter);
 	assert.ok(!reporter.receivedMessage);
 	assert.strictEqual(result.custom.length, 1);
 	let task = result.custom[0];
@@ -352,7 +367,7 @@ function testDefaultProblemMatcher(external: ExternalTaskRunnerConfiguration, re
 function testConfiguration(external: ExternalTaskRunnerConfiguration, builder: ConfiguationBuilder): void {
 	builder.done();
 	let reporter = new ProblemReporter();
-	let result = parse(external, reporter);
+	let result = parse(workspaceFolder, Platform.platform, external, reporter);
 	if (reporter.receivedMessage) {
 		assert.ok(false, reporter.lastMessage);
 	}
@@ -444,10 +459,14 @@ function assertConfiguration(result: ParseResult, expected: Tasks.Task[]): void 
 function assertTask(actual: Tasks.Task, expected: Tasks.Task) {
 	assert.ok(actual._id);
 	assert.strictEqual(actual.name, expected.name, 'name');
-	assertCommandConfiguration(actual.command, expected.command);
+	if (!Tasks.InMemoryTask.is(actual) && !Tasks.InMemoryTask.is(expected)) {
+		assertCommandConfiguration(actual.command, expected.command);
+	}
 	assert.strictEqual(actual.isBackground, expected.isBackground, 'isBackground');
-	assert.strictEqual(actual.promptOnClose, expected.promptOnClose, 'promptOnClose');
 	assert.strictEqual(typeof actual.problemMatchers, typeof expected.problemMatchers);
+	assert.strictEqual(actual.promptOnClose, expected.promptOnClose, 'promptOnClose');
+	assert.strictEqual(actual.group, expected.group, 'group');
+	assert.strictEqual(actual.groupType, expected.groupType, 'groupType');
 	if (actual.problemMatchers && expected.problemMatchers) {
 		assert.strictEqual(actual.problemMatchers.length, expected.problemMatchers.length);
 		for (let i = 0; i < actual.problemMatchers.length; i++) {
@@ -715,7 +734,7 @@ suite('Tasks version 0.1.0', () => {
 			task('tsc', 'tsc').
 			group(Tasks.TaskGroup.Build).
 			command().suppressTaskName(true).
-			options({ cwd: '${workspaceRoot}', env: { key: 'value' } });
+			options({ cwd: '${workspaceFolder}', env: { key: 'value' } });
 		testConfiguration(
 			{
 				version: '0.1.0',
@@ -1461,7 +1480,111 @@ suite('Tasks version 2.0.0', () => {
 			presentation().echo(true);
 		testConfiguration(external, builder);
 	});
-
+	test('Global group none', () => {
+		let external: ExternalTaskRunnerConfiguration = {
+			version: '2.0.0',
+			command: 'dir',
+			type: 'shell',
+			group: 'none'
+		};
+		let builder = new ConfiguationBuilder();
+		builder.task('dir', 'dir').
+			command().suppressTaskName(true).
+			runtime(Tasks.RuntimeType.Shell).
+			presentation().echo(true);
+		testConfiguration(external, builder);
+	});
+	test('Global group build', () => {
+		let external: ExternalTaskRunnerConfiguration = {
+			version: '2.0.0',
+			command: 'dir',
+			type: 'shell',
+			group: 'build'
+		};
+		let builder = new ConfiguationBuilder();
+		builder.task('dir', 'dir').
+			group(Tasks.TaskGroup.Build).
+			command().suppressTaskName(true).
+			runtime(Tasks.RuntimeType.Shell).
+			presentation().echo(true);
+		testConfiguration(external, builder);
+	});
+	test('Global group default build', () => {
+		let external: ExternalTaskRunnerConfiguration = {
+			version: '2.0.0',
+			command: 'dir',
+			type: 'shell',
+			group: { kind: 'build', isDefault: true }
+		};
+		let builder = new ConfiguationBuilder();
+		builder.task('dir', 'dir').
+			group(Tasks.TaskGroup.Build).
+			groupType(Tasks.GroupType.default).
+			command().suppressTaskName(true).
+			runtime(Tasks.RuntimeType.Shell).
+			presentation().echo(true);
+		testConfiguration(external, builder);
+	});
+	test('Local group none', () => {
+		let external: ExternalTaskRunnerConfiguration = {
+			version: '2.0.0',
+			tasks: [
+				{
+					taskName: 'dir',
+					command: 'dir',
+					type: 'shell',
+					group: 'none'
+				}
+			]
+		};
+		let builder = new ConfiguationBuilder();
+		builder.task('dir', 'dir').
+			command().suppressTaskName(true).
+			runtime(Tasks.RuntimeType.Shell).
+			presentation().echo(true);
+		testConfiguration(external, builder);
+	});
+	test('Local group build', () => {
+		let external: ExternalTaskRunnerConfiguration = {
+			version: '2.0.0',
+			tasks: [
+				{
+					taskName: 'dir',
+					command: 'dir',
+					type: 'shell',
+					group: 'build'
+				}
+			]
+		};
+		let builder = new ConfiguationBuilder();
+		builder.task('dir', 'dir').
+			group(Tasks.TaskGroup.Build).
+			command().suppressTaskName(true).
+			runtime(Tasks.RuntimeType.Shell).
+			presentation().echo(true);
+		testConfiguration(external, builder);
+	});
+	test('Local group default build', () => {
+		let external: ExternalTaskRunnerConfiguration = {
+			version: '2.0.0',
+			tasks: [
+				{
+					taskName: 'dir',
+					command: 'dir',
+					type: 'shell',
+					group: { kind: 'build', isDefault: true }
+				}
+			]
+		};
+		let builder = new ConfiguationBuilder();
+		builder.task('dir', 'dir').
+			group(Tasks.TaskGroup.Build).
+			groupType(Tasks.GroupType.default).
+			command().suppressTaskName(true).
+			runtime(Tasks.RuntimeType.Shell).
+			presentation().echo(true);
+		testConfiguration(external, builder);
+	});
 });
 
 suite('Bugs / regression tests', () => {
@@ -1474,7 +1597,7 @@ suite('Bugs / regression tests', () => {
 			windows: {
 				command: 'powershell',
 				options: {
-					cwd: '${workspaceRoot}'
+					cwd: '${workspaceFolder}'
 				},
 				tasks: [
 					{
@@ -1497,7 +1620,7 @@ suite('Bugs / regression tests', () => {
 			osx: {
 				command: '/bin/bash',
 				options: {
-					cwd: '${workspaceRoot}'
+					cwd: '${workspaceFolder}'
 				},
 				tasks: [
 					{
@@ -1518,14 +1641,14 @@ suite('Bugs / regression tests', () => {
 			builder.task('composeForDebug', 'powershell').
 				command().suppressTaskName(true).
 				args(['-ExecutionPolicy', 'RemoteSigned', '.\\dockerTask.ps1', '-ComposeForDebug', '-Environment', 'debug']).
-				options({ cwd: '${workspaceRoot}' }).
+				options({ cwd: '${workspaceFolder}' }).
 				presentation().echo(true).reveal(Tasks.RevealKind.Always);
 			testConfiguration(external, builder);
 		} else if (Platform.isMacintosh) {
 			builder.task('composeForDebug', '/bin/bash').
 				command().suppressTaskName(true).
 				args(['-c', './dockerTask.sh composeForDebug debug']).
-				options({ cwd: '${workspaceRoot}' }).
+				options({ cwd: '${workspaceFolder}' }).
 				presentation().reveal(Tasks.RevealKind.Always);
 			testConfiguration(external, builder);
 		}
